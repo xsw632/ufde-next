@@ -44,9 +44,9 @@ const flowData: {
   label: string;
   data: FlowInfo[];
 }[] = [
-  { value: "DC", label: "DC", data: dcFlows },
-  { value: "Yosys", label: "Yosys", data: yosysFlows },
-];
+    { value: "DC", label: "DC", data: dcFlows },
+    { value: "Yosys", label: "Yosys", data: yosysFlows },
+  ];
 
 const flowsNameMap = (name: string) => {
   return flowData.find((flow) => flow.value === name)?.data;
@@ -284,7 +284,7 @@ function FlowItems(props: {
       }
       props.setActive(tmpActive);
     })();
-  });
+  }, [project?.name, project?.path]);
 
   return (
     <Timeline

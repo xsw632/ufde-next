@@ -14,7 +14,6 @@ import { useEffect } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { modals } from "@mantine/modals";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
-const appWindow = getCurrentWebviewWindow()
 
 const ProjectContext = createContext<{
   project: ProjectInfo | null;
@@ -26,12 +25,12 @@ const ProjectContext = createContext<{
   setProjectModified: (modified: boolean) => void;
 }>({
   project: null,
-  setProject: () => {},
-  setNavLabel: () => {},
+  setProject: () => { },
+  setNavLabel: () => { },
   recentlyOpenedProjects: [],
-  setRecentlyOpenedProjects: () => {},
+  setRecentlyOpenedProjects: () => { },
   projectModified: false,
-  setProjectModified: () => {},
+  setProjectModified: () => { },
 });
 
 type NavLinkData = {
@@ -101,7 +100,13 @@ function App() {
   >([]);
 
   const [projectModified, setProjectModified] = useState<boolean>(false);
-  const bypassCloseGuardRef = useRef(false);
+
+  // Use refs so the onCloseRequested listener always sees current values
+  // without needing to re-register on every state change
+  const projectRef = useRef(project);
+  const projectModifiedRef = useRef(projectModified);
+  useEffect(() => { projectRef.current = project; }, [project]);
+  useEffect(() => { projectModifiedRef.current = projectModified; }, [projectModified]);
 
   useEffect(() => {
     const projects = localStorage.getItem("recentlyOpenedProjects");
@@ -111,12 +116,11 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const unlisten = appWindow.onCloseRequested((e) => {
-      if (bypassCloseGuardRef.current) {
-        return;
-      }
-
-      if (project != null && projectModified) {
+    const appWindow = getCurrentWebviewWindow();
+    const unlisten = appWindow.onCloseRequested(async (e) => {
+      const currentProject = projectRef.current;
+      const currentModified = projectModifiedRef.current;
+      if (currentProject != null && currentModified) {
         e.preventDefault();
         modals.openConfirmModal({
           title: "Save Project",
@@ -125,26 +129,26 @@ function App() {
           labels: { confirm: "Yes", cancel: "No" },
           confirmProps: { color: "red" },
           onConfirm: () => {
-            const { path, ...rest } = project;
+            const { path, ...rest } = currentProject;
             writeTextFile(path, JSON.stringify(rest)).then(() => {
-              bypassCloseGuardRef.current = true;
-              appWindow.close();
+              appWindow.destroy();
             });
           },
           onCancel: () => {
-            bypassCloseGuardRef.current = true;
-            appWindow.close();
+            appWindow.destroy();
           },
         });
       }
+      // else: don't preventDefault — window closes normally
     });
 
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [project, projectModified]);
+  }, []); // register once, use refs for current values
 
   useEffect(() => {
+    const appWindow = getCurrentWebviewWindow();
     if (project) {
       appWindow.setTitle(
         "UFDE+ - " + project.name + (projectModified ? "*" : "")
