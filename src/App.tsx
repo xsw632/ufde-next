@@ -1,7 +1,7 @@
 import { AppShell, NavLink } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useTranslation } from "react-i18next";
-import { createContext, useState, useContext } from "react";
+import { createContext, useState, useContext, useRef } from "react";
 import { TbSettings, TbChevronRight, TbFile, TbActivity } from "react-icons/tb";
 
 import { ProjectInfo, RecentlyOpenedProjectsType } from "./model/project";
@@ -101,6 +101,7 @@ function App() {
   >([]);
 
   const [projectModified, setProjectModified] = useState<boolean>(false);
+  const bypassCloseGuardRef = useRef(false);
 
   useEffect(() => {
     const projects = localStorage.getItem("recentlyOpenedProjects");
@@ -111,8 +112,12 @@ function App() {
 
   useEffect(() => {
     const unlisten = appWindow.onCloseRequested((e) => {
-      e.preventDefault();
+      if (bypassCloseGuardRef.current) {
+        return;
+      }
+
       if (project != null && projectModified) {
+        e.preventDefault();
         modals.openConfirmModal({
           title: "Save Project",
           centered: true,
@@ -122,15 +127,15 @@ function App() {
           onConfirm: () => {
             const { path, ...rest } = project;
             writeTextFile(path, JSON.stringify(rest)).then(() => {
+              bypassCloseGuardRef.current = true;
               appWindow.close();
             });
           },
           onCancel: () => {
+            bypassCloseGuardRef.current = true;
             appWindow.close();
           },
         });
-      } else {
-        appWindow.close();
       }
     });
 
